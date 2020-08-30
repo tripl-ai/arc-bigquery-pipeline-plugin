@@ -15,33 +15,29 @@ import ai.tripl.arc.util.ExtractUtils
 import ai.tripl.arc.util.MetadataUtils
 import ai.tripl.arc.util.Utils
 
-class BigQueryLoad extends PipelineStagePlugin {
+class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
 
-  val version = Utils.getFrameworkVersion
+  val version = ai.tripl.arc.bigquery.BuildInfo.version
+
+  val snippet = """{
+    |  "type": "BigQueryLoad",
+    |  "name": "BigQueryLoad",
+    |  "environments": [
+    |    "production",
+    |    "test"
+    |  ],
+    |  "inputView": "inputView",
+    |  "table": "dataset.table"
+    |}""".stripMargin
+
+  val documentationURI = new java.net.URI(s"${baseURI}/load/#bigqueryload")
 
   def instantiate(index: Int, config: com.typesafe.config.Config)(implicit spark: SparkSession, logger: ai.tripl.arc.util.log.logger.Logger, arcContext: ARCContext): Either[List[ai.tripl.arc.config.Error.StageError], PipelineStage] = {
     import ai.tripl.arc.config.ConfigReader._
     import ai.tripl.arc.config.ConfigUtils._
     implicit val c = config
 
-    val expectedKeys = "type" ::
-                       "name" ::
-                       "description" ::
-                       "environments" ::
-                       "inputView" :: 
-                       "saveMode" ::
-                       "table" ::
-                       "dataset" ::
-                       "project" ::
-                       "parentProject" ::
-                       "temporaryGcsBucket" ::
-                       "createDisposition" ::
-                       "partitionField" ::
-                       "partitionExpirationMs" ::
-                       "clusteredFields" ::
-                       "allowFieldAddition" ::
-                       "allowFieldRelaxation" ::
-                       "params" :: Nil
+    val expectedKeys = "type" :: "name" :: "description" :: "environments" :: "inputView" :: "saveMode" :: "table" :: "dataset" :: "project" :: "parentProject" :: "temporaryGcsBucket" :: "createDisposition" :: "partitionField" :: "partitionExpirationMs" :: "clusteredFields" :: "allowFieldAddition" :: "allowFieldRelaxation" :: "params" :: Nil
 
     val invalidKeys = checkValidKeys(c)(expectedKeys)
     val name = getValue[String]("name")
@@ -57,14 +53,14 @@ class BigQueryLoad extends PipelineStagePlugin {
     val project = getOptionalValue[String]("project")
     val parentProject = getOptionalValue[String]("parentProject")
     val temporaryGcsBucket = getValue[String]("temporaryGcsBucket")
-    val createDisposition = getOptionalValue[String]("createDisposition")
+    val createDisposition = getValue[String]("createDisposition", default = Some("CREATE_IF_NEEDED"))
     val partitionField = getOptionalValue[String]("partitionField")
     val partitionExpirationMs = getOptionalValue[String]("partitionExpirationMs")
     val clusteredFields = getOptionalValue[String]("clusteredFields")
     val allowFieldAddition = getOptionalValue[java.lang.Boolean]("allowFieldAddition")
     val allowFieldRelaxation = getOptionalValue[java.lang.Boolean]("allowFieldRelaxation")
 
-    (name, description, saveMode, inputView, table, dataset, 
+    (name, description, saveMode, inputView, table, dataset,
       project, parentProject, temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs, clusteredFields,
       allowFieldAddition, allowFieldRelaxation, invalidKeys) match {
 
@@ -74,29 +70,32 @@ class BigQueryLoad extends PipelineStagePlugin {
 
         val stage = BigQueryLoadStage(
           plugin=this,
-          name = name,
-          description = description,
-          inputView = inputView,
-          saveMode = saveMode,
-          table = table,
-          dataset = dataset,
-          project = project,
-          parentProject = parentProject,
-          temporaryGcsBucket = temporaryGcsBucket,
-          createDisposition = createDisposition,
-          partitionField = partitionField,
-          partitionExpirationMs = partitionExpirationMs,
-          clusteredFields = clusteredFields,
-          allowFieldAddition = allowFieldAddition,
-          allowFieldRelaxation = allowFieldRelaxation,
+          name=name,
+          description=description,
+          inputView=inputView,
+          saveMode=saveMode,
+          table=table,
+          dataset=dataset,
+          project=project,
+          parentProject=parentProject,
+          temporaryGcsBucket=temporaryGcsBucket,
+          createDisposition=createDisposition,
+          partitionField=partitionField,
+          partitionExpirationMs=partitionExpirationMs,
+          clusteredFields=clusteredFields,
+          allowFieldAddition=allowFieldAddition,
+          allowFieldRelaxation=allowFieldRelaxation,
           params=params
         )
-        
+
         stage.stageDetail.put("inputView", inputView)
         stage.stageDetail.put("params", params.asJava)
         stage.stageDetail.put("saveMode", saveMode.toString.toLowerCase)
+        project.foreach { project => stage.stageDetail.put("dataset", dataset) }
         stage.stageDetail.put("table", table)
         stage.stageDetail.put("temporaryGcsBucket", temporaryGcsBucket)
+        stage.stageDetail.put("createDisposition", createDisposition)
+        project.foreach { project => stage.stageDetail.put("project", project) }
 
         Right(stage)
       case _ =>
@@ -121,7 +120,7 @@ case class BigQueryLoadStage(
   project: Option[String],
   parentProject: Option[String],
   temporaryGcsBucket: String,
-  createDisposition: Option[String],
+  createDisposition: String,
   partitionField: Option[String],
   partitionExpirationMs: Option[String],
   // we don't add partitionType as there is only one kind - DAY
@@ -150,7 +149,6 @@ object BigQueryLoadStage {
       } else {
         val options = collection.mutable.HashMap[String, String]()
 
-        options += "table" -> table
         options += "temporaryGcsBucket" -> temporaryGcsBucket
         dataset.foreach( options += "dataset" -> _ )
         project.foreach( options += "project" -> _ )
@@ -161,14 +159,13 @@ object BigQueryLoadStage {
         allowFieldAddition.foreach( options += "allowFieldAddition" -> _.toString )
         allowFieldRelaxation.foreach( options += "allowFieldRelaxation" -> _.toString )
 
-        df.write.format("bigquery").options(options).save()
+        df.write.format("bigquery").options(options).save(table)
       }
     } catch {
       case e: Exception => throw new Exception(e) with DetailException {
         override val detail = stage.stageDetail
       }
     }
-
 
     Option(df)
   }

@@ -15,35 +15,29 @@ import ai.tripl.arc.util.ExtractUtils
 import ai.tripl.arc.util.MetadataUtils
 import ai.tripl.arc.util.Utils
 
-class BigQueryExtract extends PipelineStagePlugin {
+class BigQueryExtract extends PipelineStagePlugin with JupyterCompleter {
 
-  val version = Utils.getFrameworkVersion
+  val version = ai.tripl.arc.bigquery.BuildInfo.version
+
+  val snippet = """{
+    |  "type": "BigQueryExtract",
+    |  "name": "BigQueryExtract",
+    |  "environments": [
+    |    "production",
+    |    "test"
+    |  ],
+    |  "table": "dataset.table",
+    |  "outputView": "outputView"
+    |}""".stripMargin
+
+  val documentationURI = new java.net.URI(s"${baseURI}/extract/#bigqueryextract")
 
   def instantiate(index: Int, config: com.typesafe.config.Config)(implicit spark: SparkSession, logger: ai.tripl.arc.util.log.logger.Logger, arcContext: ARCContext): Either[List[ai.tripl.arc.config.Error.StageError], PipelineStage] = {
     import ai.tripl.arc.config.ConfigReader._
     import ai.tripl.arc.config.ConfigUtils._
     implicit val c = config
 
-    val expectedKeys = "type" ::
-                       "name" ::
-                       "description" ::
-                       "environments" ::
-                       "outputView" :: 
-                       "numPartitions" ::
-                       "partitionBy" ::
-                       "persist" ::
-                       "schemaURI" ::
-                       "schemaView" ::
-                       "table" ::
-                       "dataset" ::
-                       "project" ::
-                       "parentProject" ::
-                       "maxParallelism" ::
-                       "viewsEnabled" ::
-                       "viewMaterializationProject" ::
-                       "viewMaterializationDataset" ::
-                       "optimizedEmptyProjection" ::
-                       "params" :: Nil
+    val expectedKeys = "type" :: "name" :: "description" :: "environments" :: "outputView" ::  "numPartitions" :: "partitionBy" :: "persist" :: "schemaURI" :: "schemaView" :: "table" :: "dataset" :: "project" :: "parentProject" :: "maxParallelism" :: "viewsEnabled" :: "viewMaterializationProject" :: "viewMaterializationDataset" :: "optimizedEmptyProjection" :: "params" :: Nil
 
     val invalidKeys = checkValidKeys(c)(expectedKeys)
     val name = getValue[String]("name")
@@ -55,7 +49,7 @@ class BigQueryExtract extends PipelineStagePlugin {
     val partitionBy = getValue[StringList]("partitionBy", default = Some(Nil))
     val authentication = readAuthentication("authentication")
 
-    val extractColumns = if(c.hasPath("schemaURI")) getValue[String]("schemaURI") |> parseURI("schemaURI") _ |> getExtractColumns("schemaURI", authentication) _ else Right(List.empty)
+    val extractColumns = if(c.hasPath("schemaURI")) getValue[String]("schemaURI") |> parseURI("schemaURI") _ |> textContentForURI("schemaURI", authentication) |> getExtractColumns("schemaURI") _ else Right(List.empty)
     val schemaView = if(c.hasPath("schemaView")) getValue[String]("schemaView") else Right("")
 
     val table = getValue[String]("table")
@@ -68,8 +62,7 @@ class BigQueryExtract extends PipelineStagePlugin {
     val viewMaterializationDataset = getOptionalValue[String]("viewMaterializationDataset")
     val optimizedEmptyProjection = getOptionalValue[java.lang.Boolean]("optimizedEmptyProjection")
 
-
-    (name, description, extractColumns, schemaView, outputView, persist, numPartitions, partitionBy, table, dataset, 
+    (name, description, extractColumns, schemaView, outputView, persist, numPartitions, partitionBy, table, dataset,
       project, parentProject, maxParallelism, viewsEnabled, viewMaterializationProject, viewMaterializationDataset,
       optimizedEmptyProjection, invalidKeys) match {
 
@@ -86,15 +79,15 @@ class BigQueryExtract extends PipelineStagePlugin {
           description=description,
           schema=schema,
           outputView=outputView,
-          table = table,
-          dataset = dataset,
-          project = project,
-          parentProject = parentProject,
-          maxParallelism = maxParallelism,
-          viewsEnabled = viewsEnabled,
-          viewMaterializationProject = viewMaterializationProject,
-          viewMaterializationDataset = viewMaterializationDataset,
-          optimizedEmptyProjection = optimizedEmptyProjection,
+          table=table,
+          dataset=dataset,
+          project=project,
+          parentProject=parentProject,
+          maxParallelism=maxParallelism,
+          viewsEnabled=viewsEnabled,
+          viewMaterializationProject=viewMaterializationProject,
+          viewMaterializationDataset=viewMaterializationDataset,
+          optimizedEmptyProjection=optimizedEmptyProjection,
           params=params,
           persist=persist,
           numPartitions=numPartitions,
@@ -166,7 +159,6 @@ object BigQueryExtractStage {
       } else {
         val options = collection.mutable.HashMap[String, String]()
 
-        options += "table" -> table
         dataset.foreach( options += "dataset" -> _ )
         project.foreach( options += "project" -> _ )
         parentProject.foreach( options += "parentProject" -> _ )
@@ -176,14 +168,13 @@ object BigQueryExtractStage {
         viewMaterializationDataset.foreach( options += "viewMaterializationDataset" -> _ )
         optimizedEmptyProjection.foreach( options += "optimizedEmptyProjection" -> _.toString )
 
-        spark.read.format("bigquery").options(options).load()
+        spark.read.format("bigquery").options(options).load(table)
       }
     } catch {
       case e: Exception => throw new Exception(e) with DetailException {
         override val detail = stage.stageDetail
       }
     }
-
 
     // set column metadata if exists
     val enrichedDF = optionSchema match {

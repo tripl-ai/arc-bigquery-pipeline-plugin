@@ -1,8 +1,7 @@
 import Dependencies._
 
-lazy val scala211 = "2.11.12"
-lazy val scala212 = "2.12.10"
-lazy val supportedScalaVersions = List(scala211)
+lazy val scala212 = "2.12.12"
+lazy val supportedScalaVersions = List(scala212)
 
 lazy val root = (project in file(".")).
   enablePlugins(BuildInfoPlugin).
@@ -28,7 +27,10 @@ lazy val root = (project in file(".")).
     resolvers += "Sonatype OSS Staging" at "https://oss.sonatype.org/content/groups/staging"
   )
 
-fork in run := true  
+fork in run := true
+
+resolvers += Resolver.mavenLocal
+publishM2Configuration := publishM2Configuration.value.withOverwrite(true)
 
 scalacOptions := Seq("-target:jvm-1.8", "-unchecked", "-deprecation")
 

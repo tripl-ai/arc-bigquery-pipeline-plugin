@@ -57,8 +57,8 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
     val partitionField = getOptionalValue[String]("partitionField")
     val partitionExpirationMs = getOptionalValue[String]("partitionExpirationMs")
     val clusteredFields = getOptionalValue[String]("clusteredFields")
-    val allowFieldAddition = getOptionalValue[java.lang.Boolean]("allowFieldAddition")
-    val allowFieldRelaxation = getOptionalValue[java.lang.Boolean]("allowFieldRelaxation")
+    val allowFieldAddition = getValue[java.lang.Boolean]("allowFieldAddition", default = Some(false))
+    val allowFieldRelaxation = getValue[java.lang.Boolean]("allowFieldRelaxation", default = Some(false))
 
     (name, description, saveMode, inputView, table, dataset,
       project, parentProject, temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs, clusteredFields,
@@ -88,14 +88,17 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
           params=params
         )
 
+        dataset.foreach { project => stage.stageDetail.put("dataset", dataset) }
+        project.foreach { project => stage.stageDetail.put("project", project) }
+        stage.stageDetail.put("allowFieldAddition", allowFieldAddition)
+        stage.stageDetail.put("allowFieldRelaxation", allowFieldRelaxation)
+        stage.stageDetail.put("createDisposition", createDisposition)
         stage.stageDetail.put("inputView", inputView)
+        stage.stageDetail.put("intermediateFormat", "parquet")
         stage.stageDetail.put("params", params.asJava)
         stage.stageDetail.put("saveMode", saveMode.toString.toLowerCase)
-        project.foreach { project => stage.stageDetail.put("dataset", dataset) }
         stage.stageDetail.put("table", table)
         stage.stageDetail.put("temporaryGcsBucket", temporaryGcsBucket)
-        stage.stageDetail.put("createDisposition", createDisposition)
-        project.foreach { project => stage.stageDetail.put("project", project) }
 
         Right(stage)
       case _ =>
@@ -125,8 +128,8 @@ case class BigQueryLoadStage(
   partitionExpirationMs: Option[String],
   // we don't add partitionType as there is only one kind - DAY
   clusteredFields: Option[String],
-  allowFieldAddition: Option[java.lang.Boolean],
-  allowFieldRelaxation: Option[java.lang.Boolean],
+  allowFieldAddition: Boolean,
+  allowFieldRelaxation: Boolean,
   params: Map[String, String]
 ) extends PipelineStage {
 

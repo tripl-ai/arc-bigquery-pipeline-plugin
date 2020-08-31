@@ -43,7 +43,6 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
     val invalidKeys = checkValidKeys(c)(expectedKeys)
     val name = getValue[String]("name")
     val description = getOptionalValue[String]("description")
-
     val inputView = getValue[String]("inputView")
     val authentication = readAuthentication("authentication")
     val saveMode = getValue[String]("saveMode", default = Some("Overwrite"), validValues = "Append" :: "ErrorIfExists" :: "Ignore" :: "Overwrite" :: Nil) |> parseSaveMode("saveMode") _
@@ -160,7 +159,7 @@ object BigQueryLoadStage {
         allowFieldAddition.foreach( options += "allowFieldAddition" -> _.toString )
         allowFieldRelaxation.foreach( options += "allowFieldRelaxation" -> _.toString )
 
-        df.write.format("bigquery").options(options).save(table)
+        df.write.mode(stage.saveMode).format("bigquery").options(options).save(table)
       }
     } catch {
       case e: Exception => throw new Exception(e) with DetailException {

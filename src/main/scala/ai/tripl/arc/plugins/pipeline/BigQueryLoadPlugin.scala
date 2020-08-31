@@ -150,10 +150,10 @@ object BigQueryLoadStage {
         val options = collection.mutable.HashMap[String, String]()
 
         options += "temporaryGcsBucket" -> temporaryGcsBucket
+        options += "createDisposition" -> createDisposition
         dataset.foreach( options += "dataset" -> _ )
         project.foreach( options += "project" -> _ )
         parentProject.foreach( options += "parentProject" -> _ )
-        createDisposition.foreach( options += "createDisposition" -> _.toString )
         partitionField.foreach( options += "partitionField" -> _ )
         partitionExpirationMs.foreach( options += "partitionExpirationMs" -> _ )
         allowFieldAddition.foreach( options += "allowFieldAddition" -> _.toString )

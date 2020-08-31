@@ -27,7 +27,8 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
     |    "test"
     |  ],
     |  "inputView": "inputView",
-    |  "table": "dataset.table"
+    |  "table": "dataset.table",
+    |  "temporaryGcsBucket": "gs://"
     |}""".stripMargin
 
   val documentationURI = new java.net.URI(s"${baseURI}/load/#bigqueryload")

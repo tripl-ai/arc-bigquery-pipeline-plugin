@@ -37,9 +37,10 @@ class BigQueryExtract extends PipelineStagePlugin with JupyterCompleter {
     import ai.tripl.arc.config.ConfigUtils._
     implicit val c = config
 
-    val expectedKeys = "type" :: "name" :: "description" :: "environments" :: "outputView" ::  "numPartitions" :: "partitionBy" :: "persist" :: "schemaURI" :: "schemaView" :: "table" :: "dataset" :: "project" :: "parentProject" :: "maxParallelism" :: "viewsEnabled" :: "viewMaterializationProject" :: "viewMaterializationDataset" :: "optimizedEmptyProjection" :: "params" :: Nil
+    val expectedKeys = "type" :: "id" :: "name" :: "description" :: "environments" :: "outputView" ::  "numPartitions" :: "partitionBy" :: "persist" :: "schemaURI" :: "schemaView" :: "table" :: "dataset" :: "project" :: "parentProject" :: "maxParallelism" :: "viewsEnabled" :: "viewMaterializationProject" :: "viewMaterializationDataset" :: "optimizedEmptyProjection" :: "params" :: Nil
 
     val invalidKeys = checkValidKeys(c)(expectedKeys)
+    val id = getOptionalValue[String]("id")
     val name = getValue[String]("name")
     val params = readMap("params", c)
     val description = getOptionalValue[String]("description")
@@ -62,19 +63,14 @@ class BigQueryExtract extends PipelineStagePlugin with JupyterCompleter {
     val viewMaterializationDataset = getOptionalValue[String]("viewMaterializationDataset")
     val optimizedEmptyProjection = getOptionalValue[java.lang.Boolean]("optimizedEmptyProjection")
 
-    (name, description, extractColumns, schemaView, outputView, persist, numPartitions, partitionBy, table, dataset,
-      project, parentProject, maxParallelism, viewsEnabled, viewMaterializationProject, viewMaterializationDataset,
-      optimizedEmptyProjection, invalidKeys) match {
-
-      case (Right(name), Right(description), Right(extractColumns), Right(schemaView), Right(outputView), Right(persist),
-            Right(numPartitions), Right(partitionBy), Right(table), Right(dataset), Right(project), Right(parentProject),
-            Right(maxParallelism), Right(viewsEnabled), Right(viewMaterializationProject), Right(viewMaterializationDataset),
-            Right(optimizedEmptyProjection), Right(invalidKeys)) =>
+    (id, name, description, extractColumns, schemaView, outputView, persist, numPartitions, partitionBy, table, dataset, project, parentProject, maxParallelism, viewsEnabled, viewMaterializationProject, viewMaterializationDataset, optimizedEmptyProjection, invalidKeys) match {
+      case (Right(id), Right(name), Right(description), Right(extractColumns), Right(schemaView), Right(outputView), Right(persist), Right(numPartitions), Right(partitionBy), Right(table), Right(dataset), Right(project), Right(parentProject), Right(maxParallelism), Right(viewsEnabled), Right(viewMaterializationProject), Right(viewMaterializationDataset), Right(optimizedEmptyProjection), Right(invalidKeys)) =>
 
         val schema = if(c.hasPath("schemaView")) Left(schemaView) else Right(extractColumns)
 
         val stage = BigQueryExtractStage(
           plugin=this,
+          id=id,
           name=name,
           description=description,
           schema=schema,
@@ -101,10 +97,7 @@ class BigQueryExtract extends PipelineStagePlugin with JupyterCompleter {
 
         Right(stage)
       case _ =>
-        val allErrors: Errors = List(name, description, schemaView, outputView, persist, numPartitions, extractColumns,
-                                     partitionBy, invalidKeys, table, dataset, project, parentProject, maxParallelism,
-                                     viewsEnabled, viewMaterializationProject, viewMaterializationDataset,
-                                     optimizedEmptyProjection).collect{ case Left(errs) => errs }.flatten
+        val allErrors: Errors = List(id, name, description, extractColumns, schemaView, outputView, persist, numPartitions, partitionBy, table, dataset, project, parentProject, maxParallelism, viewsEnabled, viewMaterializationProject, viewMaterializationDataset, optimizedEmptyProjection, invalidKeys).collect{ case Left(errs) => errs }.flatten
         val stageName = stringOrDefault(name, "unnamed stage")
         val err = StageError(index, stageName, c.origin.lineNumber, allErrors)
         Left(err :: Nil)
@@ -114,6 +107,7 @@ class BigQueryExtract extends PipelineStagePlugin with JupyterCompleter {
 
 case class BigQueryExtractStage(
   plugin: BigQueryExtract,
+  id: Option[String],
   name: String,
   description: Option[String],
   schema: Either[String, List[ExtractColumn]],

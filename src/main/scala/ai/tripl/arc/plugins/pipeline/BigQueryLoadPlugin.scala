@@ -38,9 +38,10 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
     import ai.tripl.arc.config.ConfigUtils._
     implicit val c = config
 
-    val expectedKeys = "type" :: "name" :: "description" :: "environments" :: "inputView" :: "saveMode" :: "table" :: "dataset" :: "project" :: "parentProject" :: "temporaryGcsBucket" :: "createDisposition" :: "partitionField" :: "partitionExpirationMs" :: "clusteredFields" :: "allowFieldAddition" :: "allowFieldRelaxation" :: "params" :: Nil
+    val expectedKeys = "type" :: "id" :: "name" :: "description" :: "environments" :: "inputView" :: "saveMode" :: "table" :: "dataset" :: "project" :: "parentProject" :: "temporaryGcsBucket" :: "createDisposition" :: "partitionField" :: "partitionExpirationMs" :: "clusteredFields" :: "allowFieldAddition" :: "allowFieldRelaxation" :: "params" :: Nil
 
     val invalidKeys = checkValidKeys(c)(expectedKeys)
+    val id = getOptionalValue[String]("id")
     val name = getValue[String]("name")
     val description = getOptionalValue[String]("description")
     val inputView = getValue[String]("inputView")
@@ -60,16 +61,12 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
     val allowFieldAddition = getValue[java.lang.Boolean]("allowFieldAddition", default = Some(false))
     val allowFieldRelaxation = getValue[java.lang.Boolean]("allowFieldRelaxation", default = Some(false))
 
-    (name, description, saveMode, inputView, table, dataset,
-      project, parentProject, temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs, clusteredFields,
-      allowFieldAddition, allowFieldRelaxation, invalidKeys) match {
-
-      case (Right(name), Right(description), Right(saveMode), Right(inputView), Right(table), Right(dataset), Right(project), Right(parentProject),
-            Right(temporaryGcsBucket), Right(createDisposition), Right(partitionField), Right(partitionExpirationMs),
-            Right(clusteredFields), Right(allowFieldAddition), Right(allowFieldRelaxation), Right(invalidKeys)) =>
+    (id, name, description, saveMode, inputView, table, dataset, project, parentProject, temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs, clusteredFields, allowFieldAddition, allowFieldRelaxation, invalidKeys) match {
+      case (Right(id), Right(name), Right(description), Right(saveMode), Right(inputView), Right(table), Right(dataset), Right(project), Right(parentProject), Right(temporaryGcsBucket), Right(createDisposition), Right(partitionField), Right(partitionExpirationMs), Right(clusteredFields), Right(allowFieldAddition), Right(allowFieldRelaxation), Right(invalidKeys)) =>
 
         val stage = BigQueryLoadStage(
           plugin=this,
+          id=id,
           name=name,
           description=description,
           inputView=inputView,
@@ -102,9 +99,7 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
 
         Right(stage)
       case _ =>
-        val allErrors: Errors = List(name, description, inputView, saveMode, invalidKeys, table, dataset, project, parentProject,
-                                     temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs, clusteredFields,
-                                     allowFieldAddition, allowFieldRelaxation).collect{ case Left(errs) => errs }.flatten
+        val allErrors: Errors = List(id, name, description, inputView, saveMode, invalidKeys, table, dataset, project, parentProject, temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs, clusteredFields, allowFieldAddition, allowFieldRelaxation).collect{ case Left(errs) => errs }.flatten
         val stageName = stringOrDefault(name, "unnamed stage")
         val err = StageError(index, stageName, c.origin.lineNumber, allErrors)
         Left(err :: Nil)
@@ -114,6 +109,7 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
 
 case class BigQueryLoadStage(
   plugin: BigQueryLoad,
+  id: Option[String],
   name: String,
   description: Option[String],
   inputView: String,
@@ -126,7 +122,6 @@ case class BigQueryLoadStage(
   createDisposition: String,
   partitionField: Option[String],
   partitionExpirationMs: Option[String],
-  // we don't add partitionType as there is only one kind - DAY
   clusteredFields: Option[String],
   allowFieldAddition: Boolean,
   allowFieldRelaxation: Boolean,
@@ -145,7 +140,6 @@ object BigQueryLoadStage {
 
     val df = spark.table(stage.inputView)
 
-    // if incoming dataset is empty create empty dataset with a known schema
     try {
       if (df.isStreaming) {
           throw new Exception("BigQueryLoad does not support streaming mode.")
@@ -154,13 +148,13 @@ object BigQueryLoadStage {
 
         options += "temporaryGcsBucket" -> temporaryGcsBucket
         options += "createDisposition" -> createDisposition
+        options += "allowFieldAddition" -> allowFieldAddition.toString
+        options += "allowFieldRelaxation" -> allowFieldRelaxation.toString
         dataset.foreach( options += "dataset" -> _ )
         project.foreach( options += "project" -> _ )
         parentProject.foreach( options += "parentProject" -> _ )
         partitionField.foreach( options += "partitionField" -> _ )
         partitionExpirationMs.foreach( options += "partitionExpirationMs" -> _ )
-        allowFieldAddition.foreach( options += "allowFieldAddition" -> _.toString )
-        allowFieldRelaxation.foreach( options += "allowFieldRelaxation" -> _.toString )
 
         df.write.mode(stage.saveMode).format("bigquery").options(options).save(table)
       }

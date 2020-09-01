@@ -1,2 +1,3 @@
+ai.tripl.arc.plugins.pipeline.BigQueryExecute
 ai.tripl.arc.plugins.pipeline.BigQueryExtract
 ai.tripl.arc.plugins.pipeline.BigQueryLoad

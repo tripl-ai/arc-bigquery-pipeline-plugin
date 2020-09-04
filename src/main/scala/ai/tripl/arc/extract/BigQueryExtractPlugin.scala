@@ -1,4 +1,4 @@
-package ai.tripl.arc.plugins.pipeline
+package ai.tripl.arc.extract
 
 import scala.collection.JavaConverters._
 
@@ -58,10 +58,10 @@ class BigQueryExtract extends PipelineStagePlugin with JupyterCompleter {
     val project = getOptionalValue[String]("project")
     val parentProject = getOptionalValue[String]("parentProject")
     val maxParallelism = getOptionalValue[Int]("maxParallelism")
-    val viewsEnabled = getOptionalValue[java.lang.Boolean]("viewsEnabled")
+    val viewsEnabled = getValue[java.lang.Boolean]("viewsEnabled", default = Some(false))
     val viewMaterializationProject = getOptionalValue[String]("viewMaterializationProject")
     val viewMaterializationDataset = getOptionalValue[String]("viewMaterializationDataset")
-    val optimizedEmptyProjection = getOptionalValue[java.lang.Boolean]("optimizedEmptyProjection")
+    val optimizedEmptyProjection = getValue[java.lang.Boolean]("optimizedEmptyProjection", default = Some(true))
 
     (id, name, description, extractColumns, schemaView, outputView, persist, numPartitions, partitionBy, table, dataset, project, parentProject, maxParallelism, viewsEnabled, viewMaterializationProject, viewMaterializationDataset, optimizedEmptyProjection, invalidKeys) match {
       case (Right(id), Right(name), Right(description), Right(extractColumns), Right(schemaView), Right(outputView), Right(persist), Right(numPartitions), Right(partitionBy), Right(table), Right(dataset), Right(project), Right(parentProject), Right(maxParallelism), Right(viewsEnabled), Right(viewMaterializationProject), Right(viewMaterializationDataset), Right(optimizedEmptyProjection), Right(invalidKeys)) =>
@@ -94,6 +94,11 @@ class BigQueryExtract extends PipelineStagePlugin with JupyterCompleter {
         stage.stageDetail.put("outputView", outputView)
         stage.stageDetail.put("params", params.asJava)
         stage.stageDetail.put("persist", java.lang.Boolean.valueOf(persist))
+        stage.stageDetail.put("viewsEnabled", java.lang.Boolean.valueOf(viewsEnabled))
+        stage.stageDetail.put("optimizedEmptyProjection", java.lang.Boolean.valueOf(optimizedEmptyProjection))
+        viewMaterializationProject.foreach { viewMaterializationProject => stage.stageDetail.put("viewMaterializationProject", viewMaterializationProject) }
+        viewMaterializationDataset.foreach { viewMaterializationDataset => stage.stageDetail.put("viewMaterializationDataset", viewMaterializationDataset) }
+
 
         Right(stage)
       case _ =>
@@ -117,10 +122,10 @@ case class BigQueryExtractStage(
   project: Option[String],
   parentProject: Option[String],
   maxParallelism: Option[Int],
-  viewsEnabled: Option[java.lang.Boolean],
+  viewsEnabled: Boolean,
   viewMaterializationProject: Option[String],
   viewMaterializationDataset: Option[String],
-  optimizedEmptyProjection: Option[java.lang.Boolean],
+  optimizedEmptyProjection: Boolean,
   params: Map[String, String],
   persist: Boolean,
   numPartitions: Option[Int],
@@ -153,14 +158,14 @@ object BigQueryExtractStage {
       } else {
         val options = collection.mutable.HashMap[String, String]()
 
+        options += "viewsEnabled" -> viewsEnabled.toString
+        options += "optimizedEmptyProjection" -> optimizedEmptyProjection.toString
         dataset.foreach( options += "dataset" -> _ )
         project.foreach( options += "project" -> _ )
         parentProject.foreach( options += "parentProject" -> _ )
         maxParallelism.foreach( options += "maxParallelism" -> _.toString )
-        viewsEnabled.foreach( options += "viewsEnabled" -> _.toString )
         viewMaterializationProject.foreach( options += "viewMaterializationProject" -> _ )
         viewMaterializationDataset.foreach( options += "viewMaterializationDataset" -> _ )
-        optimizedEmptyProjection.foreach( options += "optimizedEmptyProjection" -> _.toString )
 
         spark.read.format("bigquery").options(options).load(table)
       }

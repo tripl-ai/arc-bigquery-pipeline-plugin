@@ -1,4 +1,4 @@
-package ai.tripl.arc.plugins.pipeline
+package ai.tripl.arc.execute
 
 import java.net.URI
 import scala.collection.JavaConverters._
@@ -62,8 +62,8 @@ class BigQueryExecute extends PipelineStagePlugin with JupyterCompleter {
     val params = readMap("params", c)
     val invalidKeys = checkValidKeys(c)(expectedKeys)
 
-    (id, name, description, parsedURI, inputSQL, inlineSQL, validSQL, invalidKeys) match {
-      case (Right(id), Right(name), Right(description), Right(parsedURI), Right(inputSQL), Right(inlineSQL), Right(validSQL), Right(invalidKeys)) =>
+    (id, name, description, parsedURI, inputSQL, inlineSQL, sql, validSQL, invalidKeys) match {
+      case (Right(id), Right(name), Right(description), Right(parsedURI), Right(inputSQL), Right(inlineSQL), Right(sql), Right(validSQL), Right(invalidKeys)) =>
         val uri = if (isInputURI) Option(parsedURI) else None
 
         val stage = BigQueryExecuteStage(
@@ -72,7 +72,7 @@ class BigQueryExecute extends PipelineStagePlugin with JupyterCompleter {
           name=name,
           description=description,
           inputURI=uri,
-          sql=inputSQL,
+          sql=sql,
           sqlParams=sqlParams,
           params=params
         )
@@ -84,7 +84,7 @@ class BigQueryExecute extends PipelineStagePlugin with JupyterCompleter {
 
         Right(stage)
       case _ =>
-        val allErrors: Errors = List(id, name, description, parsedURI, inputSQL, inlineSQL, validSQL, invalidKeys).collect{ case Left(errs) => errs }.flatten
+        val allErrors: Errors = List(id, name, description, parsedURI, inputSQL, inlineSQL, sql, validSQL, invalidKeys).collect{ case Left(errs) => errs }.flatten
         val stageName = stringOrDefault(name, "unnamed stage")
         val err = StageError(index, stageName, c.origin.lineNumber, allErrors)
         Left(err :: Nil)

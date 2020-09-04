@@ -1,4 +1,4 @@
-package ai.tripl.arc.plugins.pipeline
+package ai.tripl.arc.load
 
 import scala.collection.JavaConverters._
 

@@ -49,6 +49,7 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
     val saveMode = getValue[String]("saveMode", default = Some("Overwrite"), validValues = "Append" :: "ErrorIfExists" :: "Ignore" :: "Overwrite" :: Nil) |> parseSaveMode("saveMode") _
     val params = readMap("params", c)
 
+    val location = getValue[String]("location")
     val table = getValue[String]("table")
     val dataset = getOptionalValue[String]("dataset")
     val project = getOptionalValue[String]("project")
@@ -61,16 +62,33 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
     val allowFieldAddition = getValue[java.lang.Boolean]("allowFieldAddition", default = Some(false))
     val allowFieldRelaxation = getValue[java.lang.Boolean]("allowFieldRelaxation", default = Some(false))
 
-    (id, name, description, saveMode, inputView, table, dataset, project, parentProject, temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs, clusteredFields, allowFieldAddition, allowFieldRelaxation, invalidKeys) match {
-      case (Right(id), Right(name), Right(description), Right(saveMode), Right(inputView), Right(table), Right(dataset), Right(project), Right(parentProject), Right(temporaryGcsBucket), Right(createDisposition), Right(partitionField), Right(partitionExpirationMs), Right(clusteredFields), Right(allowFieldAddition), Right(allowFieldRelaxation), Right(invalidKeys)) =>
+    val dataCatalogEntryGroupName = getValue[String]("dataCatalogEntryGroupName")
+    val dataCatalogEntryGroupDescription = getValue[String]("dataCatalogEntryGroupDescription")
+    val dataCatalogEntryName = getValue[String]("dataCatalogEntryName")
+    val dataCatalogEntryDescription = getValue[String]("dataCatalogEntryDescription")
 
-        val stage = BigQueryLoadStage(
+    val dataCatalogEntry: Either[Errors, DataCatalogEntry] = (dataCatalogEntryGroupName, dataCatalogEntryGroupDescription, dataCatalogEntryName, dataCatalogEntryDescription) match {
+      case (Right(dataCatalogEntryGroupName), Right(dataCatalogEntryGroupDescription), Right(dataCatalogEntryName), Right(dataCatalogEntryDescription)) =>
+            Right(DataCatalogEntry(dataCatalogEntryGroupName, dataCatalogEntryGroupDescription, dataCatalogEntryName, dataCatalogEntryDescription))
+      case _ =>
+        val allErrors: Errors = List(dataCatalogEntryName, dataCatalogEntryDescription, dataCatalogEntryGroupName, dataCatalogEntryGroupDescription).collect{ case Left(errs) => errs }.flatten
+        Left(allErrors)
+    }
+
+    (id, name, description, saveMode, inputView, location, table, dataset, project, parentProject, temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs, 
+      clusteredFields, allowFieldAddition, allowFieldRelaxation, invalidKeys, dataCatalogEntry) match {
+      case (Right(id), Right(name), Right(description), Right(saveMode), Right(inputView), Right(location), Right(table), Right(dataset), Right(project), Right(parentProject), Right(temporaryGcsBucket),
+              Right(createDisposition), Right(partitionField), Right(partitionExpirationMs), Right(clusteredFields), Right(allowFieldAddition), Right(allowFieldRelaxation), Right(invalidKeys),
+              Right(dataCatalogEntry)) =>
+
+       val stage = BigQueryLoadStage(
           plugin=this,
           id=id,
           name=name,
           description=description,
           inputView=inputView,
           saveMode=saveMode,
+          location=location,
           table=table,
           dataset=dataset,
           project=project,
@@ -82,6 +100,7 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
           clusteredFields=clusteredFields,
           allowFieldAddition=allowFieldAddition,
           allowFieldRelaxation=allowFieldRelaxation,
+          dataCatalogEntry=dataCatalogEntry,
           params=params
         )
 
@@ -95,17 +114,30 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
         stage.stageDetail.put("params", params.asJava)
         stage.stageDetail.put("saveMode", saveMode.toString.toLowerCase)
         stage.stageDetail.put("table", table)
+        stage.stageDetail.put("location", location)
         stage.stageDetail.put("temporaryGcsBucket", temporaryGcsBucket)
+        stage.stageDetail.put("dataCatalogEntryGroupName", dataCatalogEntry.dataCatalogEntryGroupName)
+        stage.stageDetail.put("dataCatalogEntryGroupDescription", dataCatalogEntry.dataCatalogEntryGroupDescription)
+        stage.stageDetail.put("dataCatalogEntryName", dataCatalogEntry.dataCatalogEntryName)
+        stage.stageDetail.put("dataCatalogEntryDescription", dataCatalogEntry.dataCatalogEntryDescription)
 
         Right(stage)
       case _ =>
-        val allErrors: Errors = List(id, name, description, inputView, saveMode, invalidKeys, table, dataset, project, parentProject, temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs, clusteredFields, allowFieldAddition, allowFieldRelaxation).collect{ case Left(errs) => errs }.flatten
+        val allErrors: Errors = List(id, name, description, inputView, saveMode, invalidKeys, location, table, dataset, project, parentProject, temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs,
+                                      clusteredFields, allowFieldAddition, allowFieldRelaxation, dataCatalogEntry).collect{ case Left(errs) => errs }.flatten
         val stageName = stringOrDefault(name, "unnamed stage")
         val err = StageError(index, stageName, c.origin.lineNumber, allErrors)
         Left(err :: Nil)
     }
   }
 }
+
+case class DataCatalogEntry(
+  dataCatalogEntryGroupName: String,
+  dataCatalogEntryGroupDescription: String,
+  dataCatalogEntryName: String,
+  dataCatalogEntryDescription: String
+)
 
 case class BigQueryLoadStage(
   plugin: BigQueryLoad,
@@ -114,6 +146,7 @@ case class BigQueryLoadStage(
   description: Option[String],
   inputView: String,
   saveMode: SaveMode,
+  location: String,
   table: String,
   dataset: Option[String],
   project: Option[String],
@@ -125,6 +158,7 @@ case class BigQueryLoadStage(
   clusteredFields: Option[String],
   allowFieldAddition: Boolean,
   allowFieldRelaxation: Boolean,
+  dataCatalogEntry: DataCatalogEntry,
   params: Map[String, String]
 ) extends PipelineStage {
 
@@ -157,6 +191,13 @@ object BigQueryLoadStage {
         partitionExpirationMs.foreach( options += "partitionExpirationMs" -> _ )
 
         df.write.mode(stage.saveMode).format("bigquery").options(options).save(table)
+
+        for (p <- project) {
+          implicit val dataCatalogContext = DataCatalog.DataCatalogContext(location, p, dataCatalogEntry.dataCatalogEntryGroupName, dataCatalogEntry.dataCatalogEntryName)
+
+          DataCatalog.createEntryGroup(dataCatalogEntry.dataCatalogEntryGroupName, dataCatalogEntry.dataCatalogEntryGroupDescription)
+          DataCatalog.createEntry(dataCatalogEntry.dataCatalogEntryName, dataCatalogEntry.dataCatalogEntryDescription, df.schema)
+        }
       }
     } catch {
       case e: Exception => throw new Exception(e) with DetailException {

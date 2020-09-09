@@ -18,12 +18,12 @@ import ai.tripl.arc.util.JDBCUtils
 import ai.tripl.arc.util.SQLUtils
 import ai.tripl.arc.util.Utils
 
-import com.google.cloud.bigquery.BigQuery
-import com.google.cloud.bigquery.BigQueryException
-import com.google.cloud.bigquery.BigQueryOptions
-import com.google.cloud.bigquery.Job
-import com.google.cloud.bigquery.JobInfo
-import com.google.cloud.bigquery.QueryJobConfiguration
+import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.BigQuery
+import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.BigQueryException
+import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.BigQueryOptions
+import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.Job
+import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.JobInfo
+import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.QueryJobConfiguration
 
 class BigQueryExecute extends PipelineStagePlugin with JupyterCompleter {
 

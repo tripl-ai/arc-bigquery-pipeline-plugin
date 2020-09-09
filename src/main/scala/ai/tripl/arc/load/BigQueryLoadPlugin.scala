@@ -38,7 +38,7 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
     import ai.tripl.arc.config.ConfigUtils._
     implicit val c = config
 
-    val expectedKeys = "type" :: "id" :: "name" :: "description" :: "environments" :: "inputView" :: "saveMode" :: "table" :: "dataset" :: "project" :: "parentProject" :: "temporaryGcsBucket" :: "createDisposition" :: "partitionField" :: "partitionExpirationMs" :: "clusteredFields" :: "allowFieldAddition" :: "allowFieldRelaxation" :: "params" :: Nil
+    val expectedKeys = "type" :: "id" :: "name" :: "description" :: "environments" :: "inputView" :: "saveMode" :: "table" :: "dataset" :: "project" :: "parentProject" :: "temporaryGcsBucket" :: "createDisposition" :: "partitionField" :: "partitionExpirationMs" :: "clusteredFields" :: "allowFieldAddition" :: "allowFieldRelaxation" :: "params" :: "location" :: "dataCatalogEntryGroupName" :: "dataCatalogEntryGroupDescription" :: "dataCatalogEntryName" :: "dataCatalogEntryDescription" :: Nil
 
     val invalidKeys = checkValidKeys(c)(expectedKeys)
     val id = getOptionalValue[String]("id")
@@ -75,7 +75,7 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
         Left(allErrors)
     }
 
-    (id, name, description, saveMode, inputView, location, table, dataset, project, parentProject, temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs, 
+    (id, name, description, saveMode, inputView, location, table, dataset, project, parentProject, temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs,
       clusteredFields, allowFieldAddition, allowFieldRelaxation, invalidKeys, dataCatalogEntry) match {
       case (Right(id), Right(name), Right(description), Right(saveMode), Right(inputView), Right(location), Right(table), Right(dataset), Right(project), Right(parentProject), Right(temporaryGcsBucket),
               Right(createDisposition), Right(partitionField), Right(partitionExpirationMs), Right(clusteredFields), Right(allowFieldAddition), Right(allowFieldRelaxation), Right(invalidKeys),

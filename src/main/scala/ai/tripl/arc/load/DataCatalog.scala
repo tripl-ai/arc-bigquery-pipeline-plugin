@@ -89,9 +89,11 @@ object DataCatalog {
            }
            cs.setType(f.dataType.catalogString)
 
-           val desc = f.metadata.getString("description")
-           if (StringUtils.isNotBlank(desc)) {
-               cs.setDescription(desc)
+           if (f.metadata.contains("description")) {
+             val desc = f.metadata.getString("description")
+             if (StringUtils.isNotBlank(desc)) {
+                cs.setDescription(desc)
+             }
            }
 
            b.addColumns(cs.build)

@@ -47,13 +47,13 @@ object DataCatalog {
         }
     }
 
-    def createEntry(displayName: String, description: String, sparkSchema: StructType)(implicit dcCxt: DataCatalogContext) {
+    def createEntry(displayName: String, description: String, bucketLocation: String, sparkSchema: StructType)(implicit dcCxt: DataCatalogContext) {
         import dcCxt._
 
         using(DataCatalogClient.create()) { client =>
             val res = Try {
                 val schema = schemaFromSparkSchema(sparkSchema)
-                val entry = entryWithSchema(displayName, description, schema)
+                val entry = entryWithSchema(displayName, description, bucketLocation, schema)
 
                 val entryRequest = CreateEntryRequest.newBuilder()
                                     .setParent(EntryGroupName.of(projectId, location, entryGroupId).toString())
@@ -92,7 +92,23 @@ object DataCatalog {
            if (f.metadata.contains("description")) {
              val desc = f.metadata.getString("description")
              if (StringUtils.isNotBlank(desc)) {
-                cs.setDescription(desc)
+                val builder = new StringBuilder()
+                val metadata = f.metadata
+                if (metadata.contains("classification")) {
+                    val classification = metadata.getMetadata("classification")
+                    if (classification.contains("pii")) {
+                        val pii = classification.getBoolean("pii")
+                        builder.append("PII | ")
+                    }
+                    if (classification.contains("level")) {
+                        val level = classification.getString("level")
+                        builder.append(level)
+                        builder.append(" | ")
+                    }
+                }
+                builder.append(desc)
+
+                cs.setDescription(builder.toString)
              }
            }
 
@@ -102,7 +118,7 @@ object DataCatalog {
        b.build
     }
 
-    def entryWithSchema(displayName: String, description: String, schema: Schema): Entry = {
+    def entryWithSchema(displayName: String, description: String, bucketLocation: String, schema: Schema): Entry = {
         val b = Entry.newBuilder()
         b.setDisplayName(displayName)
         b.setDescription(description)
@@ -110,6 +126,7 @@ object DataCatalog {
         
         //val ts = TableSpec.newBuilder().
         //b.setBigQueryTableSpec(BigQueryTableSpec.newBuilder().addFilePatterns("gs://my_bucket/*").build())
+        .setGcsFilesetSpec(GcsFilesetSpec.newBuilder().addFilePatterns(bucketLocation).build())
         b.setType(EntryType.FILESET)
 
         b.build

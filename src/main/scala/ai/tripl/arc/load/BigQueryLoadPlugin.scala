@@ -66,12 +66,13 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
     val dataCatalogEntryGroupDescription = getValue[String]("dataCatalogEntryGroupDescription")
     val dataCatalogEntryName = getValue[String]("dataCatalogEntryName")
     val dataCatalogEntryDescription = getValue[String]("dataCatalogEntryDescription")
+    val bucketLocation = getValue[String]("dataCatalogBucketLocation")
 
-    val dataCatalogEntry: Either[Errors, DataCatalogEntry] = (dataCatalogEntryGroupName, dataCatalogEntryGroupDescription, dataCatalogEntryName, dataCatalogEntryDescription) match {
-      case (Right(dataCatalogEntryGroupName), Right(dataCatalogEntryGroupDescription), Right(dataCatalogEntryName), Right(dataCatalogEntryDescription)) =>
-            Right(DataCatalogEntry(dataCatalogEntryGroupName, dataCatalogEntryGroupDescription, dataCatalogEntryName, dataCatalogEntryDescription))
+    val dataCatalogEntry: Either[Errors, DataCatalogEntry] = (dataCatalogEntryGroupName, dataCatalogEntryGroupDescription, dataCatalogEntryName, dataCatalogEntryDescription, bucketLocation) match {
+      case (Right(dataCatalogEntryGroupName), Right(dataCatalogEntryGroupDescription), Right(dataCatalogEntryName), Right(dataCatalogEntryDescription), Right(bucketLocation)) =>
+            Right(DataCatalogEntry(dataCatalogEntryGroupName, dataCatalogEntryGroupDescription, dataCatalogEntryName, dataCatalogEntryDescription, bucketLocation))
       case _ =>
-        val allErrors: Errors = List(dataCatalogEntryName, dataCatalogEntryDescription, dataCatalogEntryGroupName, dataCatalogEntryGroupDescription).collect{ case Left(errs) => errs }.flatten
+        val allErrors: Errors = List(dataCatalogEntryName, dataCatalogEntryDescription, dataCatalogEntryGroupName, dataCatalogEntryGroupDescription, bucketLocation).collect{ case Left(errs) => errs }.flatten
         Left(allErrors)
     }
 
@@ -120,6 +121,7 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
         stage.stageDetail.put("dataCatalogEntryGroupDescription", dataCatalogEntry.dataCatalogEntryGroupDescription)
         stage.stageDetail.put("dataCatalogEntryName", dataCatalogEntry.dataCatalogEntryName)
         stage.stageDetail.put("dataCatalogEntryDescription", dataCatalogEntry.dataCatalogEntryDescription)
+        stage.stageDetail.put("dataCatalogBucketLocation", dataCatalogEntry.dataCatalogBucketLocation)
 
         Right(stage)
       case _ =>
@@ -136,7 +138,8 @@ case class DataCatalogEntry(
   dataCatalogEntryGroupName: String,
   dataCatalogEntryGroupDescription: String,
   dataCatalogEntryName: String,
-  dataCatalogEntryDescription: String
+  dataCatalogEntryDescription: String,
+  dataCatalogBucketLocation: String
 )
 
 case class BigQueryLoadStage(
@@ -196,7 +199,7 @@ object BigQueryLoadStage {
           implicit val dataCatalogContext = DataCatalog.DataCatalogContext(location, p, dataCatalogEntry.dataCatalogEntryGroupName, dataCatalogEntry.dataCatalogEntryName)
 
           DataCatalog.createEntryGroup(dataCatalogEntry.dataCatalogEntryGroupName, dataCatalogEntry.dataCatalogEntryGroupDescription)
-          DataCatalog.createEntry(dataCatalogEntry.dataCatalogEntryName, dataCatalogEntry.dataCatalogEntryDescription, df.schema)
+          DataCatalog.createEntry(dataCatalogEntry.dataCatalogEntryName, dataCatalogEntry.dataCatalogEntryDescription, dataCatalogEntry.dataCatalogBucketLocation, df.schema)
         }
       }
     } catch {

@@ -2,6 +2,7 @@
 
 ## 1.2.0
 
+- **FIX** `BigQueryExecute` was not waiting for execution to complete properly resulting in missed errors.
 - add `location` and `jobName` parameters to `BigQueryExecute` to allow finer control of the BigQuery Job.
 
 ## 1.1.0

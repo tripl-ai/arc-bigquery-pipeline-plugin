@@ -139,10 +139,12 @@ object BigQueryExecuteStage {
         stage.jobName.foreach { jobName => jobId.setJob(jobName) }
 
         val queryConfig = QueryJobConfiguration.newBuilder(sql)
+        queryConfig.setUseLegacySql(false)
 
-        val job = bigquery.create(JobInfo.of(jobId.build(), queryConfig.build())).waitFor()
-        if (!job.isDone) {
-          throw new Exception("execution unsuccessful")
+        val completedJob = bigquery.create(JobInfo.of(jobId.build(), queryConfig.build())).waitFor()
+        Option(completedJob.getStatus.getError) match {
+          case Some(error) => throw new Exception(completedJob.getStatus.getError.getMessage)
+          case None =>
         }
     } catch {
       case e: Exception => throw new Exception(e) with DetailException {

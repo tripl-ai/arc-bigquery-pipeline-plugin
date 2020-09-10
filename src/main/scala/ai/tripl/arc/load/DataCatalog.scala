@@ -26,7 +26,7 @@ object DataCatalog {
                                     .setDisplayName(displayName)
                                     .setDescription(description)
                                     .build()
-                
+
                 val entryGroupRequest = CreateEntryGroupRequest.newBuilder()
                                             .setParent(LocationName.of(projectId, location).toString())
                                             .setEntryGroupId(entryGroupId)
@@ -123,7 +123,7 @@ object DataCatalog {
         b.setDisplayName(displayName)
         b.setDescription(description)
         b.setSchema(schema)
-        
+
         //val ts = TableSpec.newBuilder().
         //b.setBigQueryTableSpec(BigQueryTableSpec.newBuilder().addFilePatterns("gs://my_bucket/*").build())
         .setGcsFilesetSpec(GcsFilesetSpec.newBuilder().addFilePatterns(bucketLocation).build())

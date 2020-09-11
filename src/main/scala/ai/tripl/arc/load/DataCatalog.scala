@@ -96,9 +96,11 @@ object DataCatalog {
                 val metadata = f.metadata
                 if (metadata.contains("classification")) {
                     val classification = metadata.getMetadata("classification")
-                    if (classification.contains("pii")) {
-                        val pii = classification.getBoolean("pii")
-                        builder.append("PII | ")
+                    if (classification.contains("is_pii")) {
+                        val pii = classification.getBoolean("is_pii")
+                        if (pii) {
+                            builder.append("PII | ")
+                        }
                     }
                     if (classification.contains("level")) {
                         val level = classification.getString("level")

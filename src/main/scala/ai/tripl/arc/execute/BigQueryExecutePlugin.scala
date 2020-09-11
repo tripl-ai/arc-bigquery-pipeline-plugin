@@ -1,6 +1,8 @@
 package ai.tripl.arc.execute
 
 import java.net.URI
+import java.util.UUID
+
 import scala.collection.JavaConverters._
 
 import java.sql.DriverManager
@@ -23,6 +25,7 @@ import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.BigQ
 import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.BigQueryOptions
 import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.Job
 import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.JobInfo
+import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.JobId
 import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.QueryJobConfiguration
 
 class BigQueryExecute extends PipelineStagePlugin with JupyterCompleter {
@@ -46,7 +49,7 @@ class BigQueryExecute extends PipelineStagePlugin with JupyterCompleter {
     import ai.tripl.arc.config.ConfigUtils._
     implicit val c = config
 
-    val expectedKeys = "type" :: "id" :: "name" :: "description" :: "environments" :: "inputURI" :: "sql" :: "sqlParams" :: "authentication" :: "params" :: Nil
+    val expectedKeys = "type" :: "id" :: "name" :: "description" :: "environments" :: "inputURI" :: "sql" :: "sqlParams" :: "authentication" :: "location" :: "params" :: Nil
     val id = getOptionalValue[String]("id")
     val name = getValue[String]("name")
     val description = getOptionalValue[String]("description")
@@ -60,10 +63,12 @@ class BigQueryExecute extends PipelineStagePlugin with JupyterCompleter {
     val sql = if (isInputURI) inputSQL else inlineSQL
     val validSQL = sql |> injectSQLParams(source, sqlParams, false) _
     val params = readMap("params", c)
+    val location = getOptionalValue[String]("location")
+    val jobName = getOptionalValue[String]("jobName")
     val invalidKeys = checkValidKeys(c)(expectedKeys)
 
-    (id, name, description, parsedURI, inputSQL, inlineSQL, sql, validSQL, invalidKeys) match {
-      case (Right(id), Right(name), Right(description), Right(parsedURI), Right(inputSQL), Right(inlineSQL), Right(sql), Right(validSQL), Right(invalidKeys)) =>
+    (id, name, description, parsedURI, inputSQL, inlineSQL, sql, validSQL, location, jobName, invalidKeys) match {
+      case (Right(id), Right(name), Right(description), Right(parsedURI), Right(inputSQL), Right(inlineSQL), Right(sql), Right(validSQL), Right(location), Right(jobName), Right(invalidKeys)) =>
         val uri = if (isInputURI) Option(parsedURI) else None
 
         val stage = BigQueryExecuteStage(
@@ -74,17 +79,21 @@ class BigQueryExecute extends PipelineStagePlugin with JupyterCompleter {
           inputURI=uri,
           sql=sql,
           sqlParams=sqlParams,
-          params=params
+          params=params,
+          location=location,
+          jobName=jobName,
         )
 
         uri.foreach { uri => stage.stageDetail.put("inputURI", uri.toString) }
         stage.stageDetail.put("sql", inputSQL)
         stage.stageDetail.put("sqlParams", sqlParams.asJava)
         stage.stageDetail.put("params", params.asJava)
+        location.foreach { uri => stage.stageDetail.put("location", location.toString) }
+        jobName.foreach { uri => stage.stageDetail.put("jobName", jobName.toString) }
 
         Right(stage)
       case _ =>
-        val allErrors: Errors = List(id, name, description, parsedURI, inputSQL, inlineSQL, sql, validSQL, invalidKeys).collect{ case Left(errs) => errs }.flatten
+        val allErrors: Errors = List(id, name, description, parsedURI, inputSQL, inlineSQL, sql, validSQL, location, jobName, invalidKeys).collect{ case Left(errs) => errs }.flatten
         val stageName = stringOrDefault(name, "unnamed stage")
         val err = StageError(index, stageName, c.origin.lineNumber, allErrors)
         Left(err :: Nil)
@@ -100,6 +109,8 @@ case class BigQueryExecuteStage(
     inputURI: Option[URI],
     sql: String,
     sqlParams: Map[String, String],
+    location: Option[String],
+    jobName: Option[String],
     params: Map[String, String]
   ) extends PipelineStage {
 
@@ -122,12 +133,18 @@ object BigQueryExecuteStage {
         // once, and can be reused for multiple requests.
         val bigquery = BigQueryOptions.getDefaultInstance.getService
 
-        val config = QueryJobConfiguration.newBuilder(sql).build
+        val jobName = "jobId_" + UUID.randomUUID().toString()
+        val jobId = JobId.newBuilder()
+        stage.location.foreach { location => jobId.setLocation(location) }
+        stage.jobName.foreach { jobName => jobId.setJob(jobName) }
 
-        // create a view using query and it will wait to complete job.
-        val job = bigquery.create(JobInfo.of(config)).waitFor()
-        if (!job.isDone) {
-          throw new Exception("execution unsuccessful")
+        val queryConfig = QueryJobConfiguration.newBuilder(sql)
+        queryConfig.setUseLegacySql(false)
+
+        val completedJob = bigquery.create(JobInfo.of(jobId.build(), queryConfig.build())).waitFor()
+        Option(completedJob.getStatus.getError) match {
+          case Some(error) => throw new Exception(completedJob.getStatus.getError.getMessage)
+          case None =>
         }
     } catch {
       case e: Exception => throw new Exception(e) with DetailException {

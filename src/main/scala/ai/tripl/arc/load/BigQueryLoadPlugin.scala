@@ -38,7 +38,7 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
     import ai.tripl.arc.config.ConfigUtils._
     implicit val c = config
 
-    val expectedKeys = "type" :: "id" :: "name" :: "description" :: "environments" :: "inputView" :: "saveMode" :: "table" :: "dataset" :: "project" :: "parentProject" :: "temporaryGcsBucket" :: "createDisposition" :: "partitionField" :: "partitionExpirationMs" :: "clusteredFields" :: "allowFieldAddition" :: "allowFieldRelaxation" :: "params" :: "location" :: "dataCatalogEntryGroupName" :: "dataCatalogEntryGroupDescription" :: "dataCatalogEntryName" :: "dataCatalogEntryDescription" :: Nil
+    val expectedKeys = "type" :: "id" :: "name" :: "description" :: "environments" :: "inputView" :: "saveMode" :: "table" :: "dataset" :: "project" :: "parentProject" :: "temporaryGcsBucket" :: "createDisposition" :: "partitionField" :: "partitionExpirationMs" :: "clusteredFields" :: "allowFieldAddition" :: "allowFieldRelaxation" :: "params" :: "location" :: "dataCatalogEntryGroupName" :: "dataCatalogEntryGroupDescription" :: "dataCatalogEntryName" :: "dataCatalogEntryDescription" :: "dataCatalogBucketLocation" :: Nil
 
     val invalidKeys = checkValidKeys(c)(expectedKeys)
     val id = getOptionalValue[String]("id")

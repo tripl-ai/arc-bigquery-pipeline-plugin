@@ -1,5 +1,10 @@
 # Change Log
 
+## 1.3.0
+
+- bump to Arc 3.4.0.
+- update BigQuery library to 0.17.2.
+
 ## 1.2.0
 
 - **FIX** `BigQueryExecute` was not waiting for execution to complete properly resulting in missed errors.

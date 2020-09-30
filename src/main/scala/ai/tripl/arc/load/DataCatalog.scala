@@ -47,13 +47,13 @@ object DataCatalog {
         }
     }
 
-    def createEntry(displayName: String, description: String, bucketLocation: String, sparkSchema: StructType)(implicit dcCxt: DataCatalogContext) {
+    def createEntry(displayName: String, description: String, datasetId: String, tableId: String, sparkSchema: StructType)(implicit dcCxt: DataCatalogContext) {
         import dcCxt._
 
         using(DataCatalogClient.create()) { client =>
             val res = Try {
                 val schema = schemaFromSparkSchema(sparkSchema)
-                val entry = entryWithSchema(displayName, description, bucketLocation, schema)
+                val entry = entryWithSchema(displayName, description, projectId, datasetId, tableId, schema)
 
                 val entryRequest = CreateEntryRequest.newBuilder()
                                     .setParent(EntryGroupName.of(projectId, location, entryGroupId).toString())
@@ -120,17 +120,12 @@ object DataCatalog {
        b.build
     }
 
-    def entryWithSchema(displayName: String, description: String, bucketLocation: String, schema: Schema): Entry = {
+    def entryWithSchema(displayName: String, description: String, projectId: String, datasetId: String, tableId: String, schema: Schema): Entry = {
         val b = Entry.newBuilder()
         b.setDisplayName(displayName)
         b.setDescription(description)
         b.setSchema(schema)
-
-        //val ts = TableSpec.newBuilder().
-        //b.setBigQueryTableSpec(BigQueryTableSpec.newBuilder().addFilePatterns("gs://my_bucket/*").build())
-        .setGcsFilesetSpec(GcsFilesetSpec.newBuilder().addFilePatterns(bucketLocation).build())
-        b.setType(EntryType.FILESET)
-
+        b.setLinkedResource(s"//bigquery.googleapis.com/projects/${projectId}/datasets/${datasetId}/tables/${tableId}")
         b.build
     }
 

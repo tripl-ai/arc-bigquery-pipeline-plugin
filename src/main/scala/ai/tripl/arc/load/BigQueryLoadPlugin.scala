@@ -195,11 +195,14 @@ object BigQueryLoadStage {
 
         df.write.mode(stage.saveMode).format("bigquery").options(options).save(table)
 
-        for (p <- project) {
+        for {
+          p <- project
+          d <- dataset
+        } {
           implicit val dataCatalogContext = DataCatalog.DataCatalogContext(location, p, dataCatalogEntry.dataCatalogEntryGroupName, dataCatalogEntry.dataCatalogEntryName)
 
           DataCatalog.createEntryGroup(dataCatalogEntry.dataCatalogEntryGroupName, dataCatalogEntry.dataCatalogEntryGroupDescription)
-          DataCatalog.createEntry(dataCatalogEntry.dataCatalogEntryName, dataCatalogEntry.dataCatalogEntryDescription, dataCatalogEntry.dataCatalogBucketLocation, df.schema)
+          DataCatalog.createEntry(dataCatalogEntry.dataCatalogEntryName, dataCatalogEntry.dataCatalogEntryDescription, d, table, df.schema)
         }
       }
     } catch {
@@ -212,4 +215,3 @@ object BigQueryLoadStage {
   }
 
 }
-

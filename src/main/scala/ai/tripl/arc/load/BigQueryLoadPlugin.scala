@@ -62,19 +62,26 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
     val allowFieldAddition = getValue[java.lang.Boolean]("allowFieldAddition", default = Some(false))
     val allowFieldRelaxation = getValue[java.lang.Boolean]("allowFieldRelaxation", default = Some(false))
 
-    val dataCatalogEntryGroupName = getValue[String]("dataCatalogEntryGroupName")
-    val dataCatalogEntryGroupDescription = getValue[String]("dataCatalogEntryGroupDescription")
-    val dataCatalogEntryName = getValue[String]("dataCatalogEntryName")
-    val dataCatalogEntryDescription = getValue[String]("dataCatalogEntryDescription")
-    val bucketLocation = getValue[String]("dataCatalogBucketLocation")
+    val dataCatalogValue = Option(readMap("dataCatalog", c))
 
-    val dataCatalogEntry: Either[Errors, DataCatalogEntry] = (dataCatalogEntryGroupName, dataCatalogEntryGroupDescription, dataCatalogEntryName, dataCatalogEntryDescription, bucketLocation) match {
-      case (Right(dataCatalogEntryGroupName), Right(dataCatalogEntryGroupDescription), Right(dataCatalogEntryName), Right(dataCatalogEntryDescription), Right(bucketLocation)) =>
-            Right(DataCatalogEntry(dataCatalogEntryGroupName, dataCatalogEntryGroupDescription, dataCatalogEntryName, dataCatalogEntryDescription, bucketLocation))
-      case _ =>
-        val allErrors: Errors = List(dataCatalogEntryName, dataCatalogEntryDescription, dataCatalogEntryGroupName, dataCatalogEntryGroupDescription, bucketLocation).collect{ case Left(errs) => errs }.flatten
-        Left(allErrors)
-    }
+    val dataCatalogEntry: Either[Errors, Option[DataCatalogEntry]] =
+      (for (dc <- dataCatalogValue if !dc.isEmpty) yield {
+      
+      val dataCatalogEntryGroupName = dc.get("entryGroupName").map(Right(_)).getOrElse(Left(ConfigError("dataCatalog.entryGroupName", None, "Data Catalog Entry Group Name missing")))
+      val dataCatalogEntryGroupDescription = dc.get("entryGroupDescription").map(Right(_)).getOrElse(Left(ConfigError("dataCatalog.entryGroupDescription", None, "Data Catalog Entry Group Description missing")))
+      val dataCatalogEntryName = dc.get("entryName").map(Right(_)).getOrElse(Left(ConfigError("dataCatalog.entryName", None, "Data Catalog Entry Name missing")))
+      val dataCatalogEntryDescription = dc.get("entryDescription").map(Right(_)).getOrElse(Left(ConfigError("dataCatalog.entryDescription", None, "Data Catalog Entry Description missing")))
+
+      val entry: Either[Errors, Option[DataCatalogEntry]] = (dataCatalogEntryGroupName, dataCatalogEntryGroupDescription, dataCatalogEntryName, dataCatalogEntryDescription) match {
+        case (Right(dataCatalogEntryGroupName), Right(dataCatalogEntryGroupDescription), Right(dataCatalogEntryName), Right(dataCatalogEntryDescription)) =>
+            Right(Option(DataCatalogEntry(dataCatalogEntryGroupName, dataCatalogEntryGroupDescription, dataCatalogEntryName, dataCatalogEntryDescription)))
+        case _ =>
+          val allErrors: Errors = List(dataCatalogEntryName, dataCatalogEntryDescription, dataCatalogEntryGroupName, dataCatalogEntryGroupDescription).collect{ case Left(errs) => errs }
+          Left(allErrors)
+      }
+
+      entry
+    }).getOrElse(Right(None))
 
     (id, name, description, saveMode, inputView, location, table, dataset, project, parentProject, temporaryGcsBucket, createDisposition, partitionField, partitionExpirationMs,
       clusteredFields, allowFieldAddition, allowFieldRelaxation, invalidKeys, dataCatalogEntry) match {
@@ -117,11 +124,13 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
         stage.stageDetail.put("table", table)
         stage.stageDetail.put("location", location)
         stage.stageDetail.put("temporaryGcsBucket", temporaryGcsBucket)
-        stage.stageDetail.put("dataCatalogEntryGroupName", dataCatalogEntry.dataCatalogEntryGroupName)
-        stage.stageDetail.put("dataCatalogEntryGroupDescription", dataCatalogEntry.dataCatalogEntryGroupDescription)
-        stage.stageDetail.put("dataCatalogEntryName", dataCatalogEntry.dataCatalogEntryName)
-        stage.stageDetail.put("dataCatalogEntryDescription", dataCatalogEntry.dataCatalogEntryDescription)
-        stage.stageDetail.put("dataCatalogBucketLocation", dataCatalogEntry.dataCatalogBucketLocation)
+
+        for (dce <- dataCatalogEntry) {
+          stage.stageDetail.put("dataCatalogEntryGroupName", dce.entryGroupName)
+          stage.stageDetail.put("dataCatalogEntryGroupDescription", dce.entryGroupDescription)
+          stage.stageDetail.put("dataCatalogEntryName", dce.entryName)
+          stage.stageDetail.put("dataCatalogEntryDescription", dce.entryDescription)
+        }
 
         Right(stage)
       case _ =>
@@ -135,11 +144,10 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
 }
 
 case class DataCatalogEntry(
-  dataCatalogEntryGroupName: String,
-  dataCatalogEntryGroupDescription: String,
-  dataCatalogEntryName: String,
-  dataCatalogEntryDescription: String,
-  dataCatalogBucketLocation: String
+  entryGroupName: String,
+  entryGroupDescription: String,
+  entryName: String,
+  entryDescription: String
 )
 
 case class BigQueryLoadStage(
@@ -161,7 +169,7 @@ case class BigQueryLoadStage(
   clusteredFields: Option[String],
   allowFieldAddition: Boolean,
   allowFieldRelaxation: Boolean,
-  dataCatalogEntry: DataCatalogEntry,
+  dataCatalogEntry: Option[DataCatalogEntry],
   params: Map[String, String]
 ) extends PipelineStage {
 
@@ -198,11 +206,12 @@ object BigQueryLoadStage {
         for {
           p <- project
           d <- dataset
+          dce <- dataCatalogEntry
         } {
-          implicit val dataCatalogContext = DataCatalog.DataCatalogContext(location, p, dataCatalogEntry.dataCatalogEntryGroupName, dataCatalogEntry.dataCatalogEntryName)
+          implicit val dataCatalogContext = DataCatalog.DataCatalogContext(location, p, dce.entryGroupName, dce.entryName)
 
-          DataCatalog.createEntryGroup(dataCatalogEntry.dataCatalogEntryGroupName, dataCatalogEntry.dataCatalogEntryGroupDescription)
-          DataCatalog.createEntry(dataCatalogEntry.dataCatalogEntryName, dataCatalogEntry.dataCatalogEntryDescription, d, table, df.schema)
+          DataCatalog.createEntryGroup(dce.entryGroupName, dce.entryGroupDescription)
+          DataCatalog.createEntry(dce.entryName, dce.entryDescription, d, table, df.schema)
         }
       }
     } catch {

@@ -47,13 +47,20 @@ object DataCatalog {
         }
     }
 
-    def createEntry(displayName: String, description: String, datasetId: String, tableId: String, sparkSchema: StructType)(implicit dcCxt: DataCatalogContext) {
+    def createEntry(displayName: String, description: String, datasetId: String, tableId: String, sparkSchema: StructType, update: Boolean = false)(implicit dcCxt: DataCatalogContext) {
         import dcCxt._
 
         using(DataCatalogClient.create()) { client =>
             val res = Try {
                 val schema = schemaFromSparkSchema(sparkSchema)
                 val entry = entryWithSchema(displayName, description, projectId, datasetId, tableId, schema)
+
+                if (update) {
+                    val entryName = EntryName.of(projectId, location, entryGroupId, entryId).toString()
+                    val deleteRequest = DeleteEntryRequest.newBuilder().setName(entryName).build()
+                    client.deleteEntry(deleteRequest)
+
+                }
 
                 val entryRequest = CreateEntryRequest.newBuilder()
                                     .setParent(EntryGroupName.of(projectId, location, entryGroupId).toString())
@@ -69,6 +76,9 @@ object DataCatalog {
                     println("\nEntry created with name: %s\n", entryResponse.getName())
                 case Failure(e: AlreadyExistsException) =>
                     println("\nEntry already exists\n")
+                    if (!update) {
+                        createEntry(displayName, description, datasetId, tableId, sparkSchema, true)
+                    }
                 case Failure(e) =>
                     throw new Exception(e)
             }
@@ -89,29 +99,28 @@ object DataCatalog {
            }
            cs.setType(f.dataType.catalogString)
 
-           if (f.metadata.contains("description")) {
-             val desc = f.metadata.getString("description")
-             if (StringUtils.isNotBlank(desc)) {
-                val builder = new StringBuilder()
-                val metadata = f.metadata
-                if (metadata.contains("classification")) {
-                    val classification = metadata.getMetadata("classification")
-                    if (classification.contains("is_pii")) {
-                        val pii = classification.getBoolean("is_pii")
-                        if (pii) {
-                            builder.append("PII | ")
-                        }
-                    }
-                    if (classification.contains("level")) {
-                        val level = classification.getString("level")
-                        builder.append(level)
-                        builder.append(" | ")
-                    }
-                }
-                builder.append(desc)
+           val metadata = f.metadata
 
-                cs.setDescription(builder.toString)
+           if (metadata.contains("description")) {
+             val builder = new StringBuilder()
+             if (metadata.contains("classification")) {
+                 val classification = metadata.getMetadata("classification")
+                 if (classification.contains("is_pii")) {
+                     val pii = classification.getBoolean("is_pii")
+                     if (pii) {
+                         builder.append("PII | ")
+                     }
+                 }
+                 if (classification.contains("level")) {
+                     val level = classification.getString("level")
+                     builder.append(level)
+                     builder.append(" | ")
+                 }
              }
+             val desc = f.metadata.getString("description")
+             builder.append(desc)
+
+             cs.setDescription(builder.toString)
            }
 
            b.addColumns(cs.build)

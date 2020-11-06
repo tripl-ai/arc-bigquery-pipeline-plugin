@@ -47,13 +47,13 @@ object DataCatalog {
         }
     }
 
-    def createEntry(displayName: String, description: String, datasetId: String, tableId: String, sparkSchema: StructType, update: Boolean = false)(implicit dcCxt: DataCatalogContext) {
+    def createEntry(displayName: String, description: String, bucketLocation: String, sparkSchema: StructType, update: Boolean = false)(implicit dcCxt: DataCatalogContext) {
         import dcCxt._
 
         using(DataCatalogClient.create()) { client =>
             val res = Try {
                 val schema = schemaFromSparkSchema(sparkSchema)
-                val entry = entryWithSchema(displayName, description, projectId, datasetId, tableId, schema)
+                val entry = entryWithSchema(displayName, description, bucketLocation, schema)
 
                 if (update) {
                     val entryName = EntryName.of(projectId, location, entryGroupId, entryId).toString()
@@ -77,7 +77,7 @@ object DataCatalog {
                 case Failure(e: AlreadyExistsException) =>
                     println("\nEntry already exists\n")
                     if (!update) {
-                        createEntry(displayName, description, datasetId, tableId, sparkSchema, true)
+                        createEntry(displayName, description, bucketLocation, sparkSchema, true)
                     }
                 case Failure(e) =>
                     throw new Exception(e)
@@ -129,12 +129,13 @@ object DataCatalog {
        b.build
     }
 
-    def entryWithSchema(displayName: String, description: String, projectId: String, datasetId: String, tableId: String, schema: Schema): Entry = {
+    def entryWithSchema(displayName: String, description: String, bucketLocation: String, schema: Schema): Entry = {
         val b = Entry.newBuilder()
         b.setDisplayName(displayName)
         b.setDescription(description)
         b.setSchema(schema)
-        b.setLinkedResource(s"//bigquery.googleapis.com/projects/${projectId}/datasets/${datasetId}/tables/${tableId}")
+        b.setGcsFilesetSpec(GcsFilesetSpec.newBuilder().addFilePatterns(bucketLocation).build())
+        b.setType(EntryType.FILESET)
         b.build
     }
 

@@ -210,7 +210,7 @@ object BigQueryLoadStage {
           p <- project
           dce <- dataCatalogEntry
         } {
-          implicit val dataCatalogContext = DataCatalog.DataCatalogContext(location, p, dce.entryGroupName, dce.entryName)
+          implicit val dataCatalogContext = DataCatalog.DataCatalogContext(location, p, dce.entryGroupName, dce.entryName, logger)
 
           DataCatalog.createEntryGroup(dce.entryGroupName, dce.entryGroupDescription)
           DataCatalog.createEntry(dce.entryName, dce.entryDescription, dce.bucketLocation, df.schema)

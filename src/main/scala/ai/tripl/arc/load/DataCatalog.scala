@@ -15,7 +15,7 @@ import ai.tripl.arc.util.ControlUtils._
 
 object DataCatalog {
 
-    case class DataCatalogContext(location: String, projectId: String, entryGroupId: String, entryId: String)
+    case class DataCatalogContext(location: String, projectId: String, entryGroupId: String, entryId: String, logger: ai.tripl.arc.util.log.logger.Logger)
 
     def createEntryGroup(displayName: String, description: String)(implicit dcCxt: DataCatalogContext) {
         import dcCxt._
@@ -38,9 +38,9 @@ object DataCatalog {
 
             res match {
                 case Success(entryGroupResponse) =>
-                    println("\nEntry Group created with name: %s\n", entryGroupResponse.getName())
+                    logger.info.message("Data Catalog Entry Group created with name: " + entryGroupResponse.getName())
                 case Failure(e: AlreadyExistsException) =>
-                    println("\nEntry Group already exists\n")
+                    logger.warn.message("Data Catalog Entry Group already exists")
                 case Failure(e) =>
                     throw new Exception(e)
             }
@@ -73,9 +73,9 @@ object DataCatalog {
 
             res match {
                 case Success(entryResponse) =>
-                    println("\nEntry created with name: %s\n", entryResponse.getName())
+                    logger.info.message("Data Catalog Entry created with name: " + entryResponse.getName())
                 case Failure(e: AlreadyExistsException) =>
-                    println("\nEntry already exists\n")
+                    logger.warn.message("Data Catalog Entry already exists")
                     if (!update) {
                         createEntry(displayName, description, bucketLocation, sparkSchema, true)
                     }

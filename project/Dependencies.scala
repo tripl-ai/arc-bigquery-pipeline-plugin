@@ -14,8 +14,8 @@ object Dependencies {
   // spark
   val sparkSql = "org.apache.spark" %% "spark-sql" % sparkVersion % "provided"
 
-  val sparkBigQuery = "com.google.cloud.spark" %% "spark-bigquery-with-dependencies" % "0.17.1"
-  val googleDataCatalogue = "com.google.cloud" % "google-cloud-datacatalog" % "1.0.1"
+  val sparkBigQuery = "com.google.cloud.spark" %% "spark-bigquery-with-dependencies" % "0.18.0"
+  val googleDataCatalogue = "com.google.cloud" % "google-cloud-datacatalog" % "1.0.9"
 
   // Project
   val etlDeps = Seq(

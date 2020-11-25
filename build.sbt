@@ -36,6 +36,21 @@ scalacOptions := Seq("-target:jvm-1.8", "-unchecked", "-deprecation")
 
 test in assembly := {}
 
+lazy val myPackage = "ai.tripl.arc"
+lazy val relocationPrefix = s"$myPackage.repackaged"
+
+lazy val renamed = Seq(
+  "avro.shaded",
+  "com.fasterxml",
+  "com.google"
+)
+lazy val notRenamed = Seq(myPackage)
+
+assemblyShadeRules in assembly := (
+      notRenamed.map(prefix => ShadeRule.rename(s"$prefix**" -> s"$prefix@1"))
+        ++: renamed.map(prefix => ShadeRule.rename(s"$prefix**" -> s"$relocationPrefix.$prefix@1"))
+      ).map(_.inAll)
+
 // META-INF discarding
 assemblyMergeStrategy in assembly := {
    {

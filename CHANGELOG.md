@@ -1,5 +1,10 @@
 # Change Log
 
+## 1.4.0
+
+- update BigQuery library to 0.18.0.
+- add support for updating Google Data Catalog by supplying `dataCatalog`.
+
 ## 1.3.1
 
 - revert to BigQuery 0.17.1 due to issue [introduced upstream](https://github.com/GoogleCloudDataproc/spark-bigquery-connector/issues/244).

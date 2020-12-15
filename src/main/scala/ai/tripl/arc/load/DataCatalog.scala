@@ -97,7 +97,7 @@ object DataCatalog {
            } else {
                cs.setMode("REQUIRED")
            }
-           cs.setType(f.dataType.catalogString)
+           cs.setType(StringUtils.replace(f.dataType.catalogString, ":", "_"))
 
            val metadata = f.metadata
 

@@ -1,5 +1,10 @@
 # Change Log
 
+## 1.5.0
+
+- **NOTE** this plugin now requires `assembly` rather than normal publishing so will not be published via Maven at this time.
+- fix the complex shading rules to prevent collisions.
+
 ## 1.4.0
 
 - update BigQuery library to 0.18.0.

@@ -83,7 +83,6 @@ lazy val renamed = Seq(
   "io.opencensus",
   "javax.annotation",
   "org.threeten",
-  "org.conscrypt",
   "org.checkerframework",
   "io.perfmark",
   "io.codehaus.mojo",
@@ -109,11 +108,10 @@ assemblyMergeStrategy in assembly := {
       case PathList(ps@_*) if ps.last.endsWith(".proto") => MergeStrategy.discard
       // Relocate netty-tcnative.so. This is necessary even though gRPC shades it, because we shade
       // gRPC.
-      /*case PathList("META-INF", "native", f) if f.contains("netty_tcnative") =>
+      case PathList("META-INF", "native", f) if f.contains("netty_tcnative") =>
         RelocationMergeStrategy(path =>
-          path.replace("native/lib", s"native/lib${relocationPrefix.replace('.', '_')}_"))*/
+          path.replace("native/lib", s"native/lib${relocationPrefix.replace('.', '_')}_"))
       case PathList("META-INF", "native", f) => MergeStrategy.first
-
       // Relocate GRPC service registries
       case PathList("META-INF", "services", _) => ServiceResourceMergeStrategy(renamed,
         relocationPrefix)

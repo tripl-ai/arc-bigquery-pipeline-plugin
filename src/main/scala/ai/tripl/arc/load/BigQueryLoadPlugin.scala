@@ -19,17 +19,16 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
 
   val version = ai.tripl.arc.bigquery.BuildInfo.version
 
-  val snippet = """{
+  def snippet()(implicit arcContext: ARCContext): String = {
+    s"""{
     |  "type": "BigQueryLoad",
     |  "name": "BigQueryLoad",
-    |  "environments": [
-    |    "production",
-    |    "test"
-    |  ],
+    |  "environments": [${arcContext.completionEnvironments.map { env => s""""${env}""""}.mkString(", ")}],
     |  "inputView": "inputView",
     |  "table": "dataset.table",
     |  "temporaryGcsBucket": "bucket"
     |}""".stripMargin
+  }
 
   val documentationURI = new java.net.URI(s"${baseURI}/load/#bigqueryload")
 
@@ -66,7 +65,7 @@ class BigQueryLoad extends PipelineStagePlugin with JupyterCompleter {
 
     val dataCatalogEntry: Either[Errors, Option[DataCatalogEntry]] =
       (for (dc <- dataCatalogValue if !dc.isEmpty) yield {
-      
+
       val dataCatalogEntryGroupName = dc.get("entryGroupName").map(Right(_)).getOrElse(Left(ConfigError("dataCatalog.entryGroupName", None, "Data Catalog Entry Group Name missing")))
       val dataCatalogEntryGroupDescription = dc.get("entryGroupDescription").map(Right(_)).getOrElse(Left(ConfigError("dataCatalog.entryGroupDescription", None, "Data Catalog Entry Group Description missing")))
       val dataCatalogEntryName = dc.get("entryName").map(Right(_)).getOrElse(Left(ConfigError("dataCatalog.entryName", None, "Data Catalog Entry Name missing")))

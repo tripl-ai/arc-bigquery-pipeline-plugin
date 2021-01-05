@@ -4,6 +4,7 @@
 
 - **NOTE** this plugin now requires `assembly` rather than normal publishing so will not be published via Maven at this time.
 - fix the complex shading rules to prevent collisions.
+- bump to Arc 3.7.0.
 
 ## 1.4.0
 

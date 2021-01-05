@@ -19,16 +19,15 @@ class BigQueryExtract extends PipelineStagePlugin with JupyterCompleter {
 
   val version = ai.tripl.arc.bigquery.BuildInfo.version
 
-  val snippet = """{
+  def snippet()(implicit arcContext: ARCContext): String = {
+    s"""{
     |  "type": "BigQueryExtract",
     |  "name": "BigQueryExtract",
-    |  "environments": [
-    |    "production",
-    |    "test"
-    |  ],
+    |  "environments": [${arcContext.completionEnvironments.map { env => s""""${env}""""}.mkString(", ")}],
     |  "table": "dataset.table",
     |  "outputView": "outputView"
     |}""".stripMargin
+  }
 
   val documentationURI = new java.net.URI(s"${baseURI}/extract/#bigqueryextract")
 

@@ -1,5 +1,10 @@
 # Change Log
 
+## 1.7.0
+
+- added `quotaProjectID` option to `BigQueryExecute`.
+- if Arc `jobId` is set include in BigQuery `jobId`.
+
 ## 1.6.0
 
 - added `projectId` option to `BigQueryExecute`

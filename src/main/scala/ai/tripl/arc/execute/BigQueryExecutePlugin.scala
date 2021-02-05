@@ -48,7 +48,7 @@ class BigQueryExecute extends PipelineStagePlugin with JupyterCompleter {
     import ai.tripl.arc.config.ConfigUtils._
     implicit val c = config
 
-    val expectedKeys = "type" :: "id" :: "name" :: "description" :: "environments" :: "inputURI" :: "sql" :: "sqlParams" :: "authentication" :: "location" :: "projectId" :: "params" :: Nil
+    val expectedKeys = "type" :: "id" :: "name" :: "description" :: "environments" :: "inputURI" :: "sql" :: "sqlParams" :: "authentication" :: "location" :: "projectId" :: "params" :: "quotaProjectId" :: Nil
     val id = getOptionalValue[String]("id")
     val name = getValue[String]("name")
     val description = getOptionalValue[String]("description")
@@ -63,12 +63,13 @@ class BigQueryExecute extends PipelineStagePlugin with JupyterCompleter {
     val validSQL = sql |> injectSQLParams(source, sqlParams, false) _
     val params = readMap("params", c)
     val projectId = getOptionalValue[String]("projectId")
+    val quotaProjectId = getOptionalValue[String]("quotaProjectId")
     val location = getOptionalValue[String]("location")
     val jobName = getOptionalValue[String]("jobName")
     val invalidKeys = checkValidKeys(c)(expectedKeys)
 
-    (id, name, description, parsedURI, inputSQL, inlineSQL, sql, validSQL, location, jobName, projectId, invalidKeys) match {
-      case (Right(id), Right(name), Right(description), Right(parsedURI), Right(inputSQL), Right(inlineSQL), Right(sql), Right(validSQL), Right(location), Right(jobName), Right(projectId), Right(invalidKeys)) =>
+    (id, name, description, parsedURI, inputSQL, inlineSQL, sql, validSQL, location, jobName, projectId, quotaProjectId, invalidKeys) match {
+      case (Right(id), Right(name), Right(description), Right(parsedURI), Right(inputSQL), Right(inlineSQL), Right(sql), Right(validSQL), Right(location), Right(jobName), Right(projectId), Right(quotaProjectId), Right(invalidKeys)) =>
         val uri = if (isInputURI) Option(parsedURI) else None
 
         val stage = BigQueryExecuteStage(
@@ -82,6 +83,7 @@ class BigQueryExecute extends PipelineStagePlugin with JupyterCompleter {
           params=params,
           location=location,
           projectId=projectId,
+          quotaProjectId=quotaProjectId,
           jobName=jobName,
         )
 
@@ -91,11 +93,12 @@ class BigQueryExecute extends PipelineStagePlugin with JupyterCompleter {
         stage.stageDetail.put("params", params.asJava)
         location.foreach { location => stage.stageDetail.put("location", location) }
         projectId.foreach { project => stage.stageDetail.put("projectId", projectId) }
+        quotaProjectId.foreach { project => stage.stageDetail.put("quotaProjectId", quotaProjectId) }
         jobName.foreach { jobName => stage.stageDetail.put("jobName", jobName) }
 
         Right(stage)
       case _ =>
-        val allErrors: Errors = List(id, name, description, parsedURI, inputSQL, inlineSQL, sql, validSQL, location, jobName, projectId, invalidKeys).collect{ case Left(errs) => errs }.flatten
+        val allErrors: Errors = List(id, name, description, parsedURI, inputSQL, inlineSQL, sql, validSQL, location, jobName, projectId, quotaProjectId, invalidKeys).collect{ case Left(errs) => errs }.flatten
         val stageName = stringOrDefault(name, "unnamed stage")
         val err = StageError(index, stageName, c.origin.lineNumber, allErrors)
         Left(err :: Nil)
@@ -114,6 +117,7 @@ case class BigQueryExecuteStage(
     location: Option[String],
     jobName: Option[String],
     projectId: Option[String],
+    quotaProjectId: Option[String],
     params: Map[String, String]
   ) extends PipelineStage {
 
@@ -137,10 +141,14 @@ object BigQueryExecuteStage {
         val bigQueryOptionsBuilder = BigQueryOptions.newBuilder
         stage.location.foreach { location => bigQueryOptionsBuilder.setLocation(location) }
         stage.projectId.foreach { projectId => bigQueryOptionsBuilder.setProjectId(projectId) }
+        stage.quotaProjectId.foreach { quotaProjectId => bigQueryOptionsBuilder.setQuotaProjectId(quotaProjectId) }
         val bigQuery = bigQueryOptionsBuilder.build.getService
 
         // create job and set location
-        val jobName = "jobId_" + UUID.randomUUID.toString
+        val jobName = arcContext.jobId match {
+          case Some(jobId) => s"jobId_${jobId}_${UUID.randomUUID.toString}"
+          case None => s"jobId_${UUID.randomUUID.toString}"
+        }
         val jobId = JobId.newBuilder
         stage.location.foreach { location => jobId.setLocation(location) }
         stage.jobName.foreach { jobName => jobId.setJob(jobName) }

@@ -14,15 +14,13 @@ object Dependencies {
   // spark
   val sparkSql = "org.apache.spark" %% "spark-sql" % sparkVersion % "provided"
 
-  val sparkBigQuery = "com.google.cloud.spark" %% "spark-bigquery-with-dependencies" % "0.18.0"
-  val googleDataCatalogue = "com.google.cloud" % "google-cloud-datacatalog" % "1.0.9"
+  val sparkBigQuery = "com.google.cloud.spark" %% "spark-bigquery-with-dependencies" % "0.19.1"
 
   // Project
   val etlDeps = Seq(
     scalaTest,
     arc,
     sparkSql,
-    sparkBigQuery,
-    googleDataCatalogue
+    sparkBigQuery
   )
 }

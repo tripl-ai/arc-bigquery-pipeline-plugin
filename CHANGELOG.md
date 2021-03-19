@@ -1,5 +1,9 @@
 # Change Log
 
+## 1.8.0
+
+- removed Data Catalog support from BigQueryLoad.
+
 ## 1.7.0
 
 - added `quotaProjectID` option to `BigQueryExecute`.
